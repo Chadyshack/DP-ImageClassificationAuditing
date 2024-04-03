@@ -20,7 +20,7 @@ import warnings; warnings.filterwarnings("ignore")
 def main(args):
 
     # Set torch device
-    device= torch.device("cuda:0")
+    device=torch.device("cuda:0")
 
     # Data directory and transformations
     data_dir = '/s/lovelace/c/nobackup/iray/dp-imgclass/PediatricChestX-rayPneumoniaData'

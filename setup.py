@@ -25,6 +25,23 @@ setuptools.setup(
     long_description=readme,
     url="",
     packages=setuptools.find_packages(exclude=['examples', 'tests']),
+    install_requires=[
+        "torch~=1.11.0",
+        "prv-accountant",
+        "transformers>=4.20.1",
+        "numpy",
+        "scipy",
+        "jupyterlab",
+        "jupyter",
+        "opacus>=1.0",
+        "ml-swissknife",
+        "opt_einsum",
+        "pytest",
+        "pydantic==1.10",
+        "tqdm>=4.62.1",
+        "deepspeed~=0.8.0",
+        "fairscale==0.4"
+    ],
     python_requires='~=3.8',
     classifiers=[
         "Programming Language :: Python :: 3",
