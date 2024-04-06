@@ -22,36 +22,61 @@ def main(args):
     # Set torch device
     device=torch.device("cuda:0")
 
-    # Data directory and transformations
-    data_dir = '/s/lovelace/c/nobackup/iray/dp-imgclass/PediatricChestX-rayPneumoniaData'
+    # Load auditing parameters
+    m = args.m
+    k_plus = args.k_plus
+    k_minus = args.k_minus
+
+    # Data transformations and loading
     data_transforms = {
         'train': torchvision.transforms.Compose([
-            torchvision.transforms.RandomResizedCrop(224),
-            torchvision.transforms.RandomHorizontalFlip(),
+            torchvision.transforms.Resize(224),
             torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+            torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
         ]),
         'test': torchvision.transforms.Compose([
-            torchvision.transforms.Resize(256),
-            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Resize(224),
             torchvision.transforms.ToTensor(),
-            torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-        ]),
+            torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ])
     }
 
-    # Load test and train datasets
-    trainset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
-    testset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'test'), data_transforms['test'])
-    
-    # Set up train and test loader
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.mini_bs, shuffle=True, num_workers=4)
+######################### TODO check start
+
+    # Load test and train datasets (denoting as full because this is reduced later)
+    full_trainset = torchvision.datasets.CIFAR10(root='data/', train=True, download=True, transform=data_transforms['train'])
+    testset = torchvision.datasets.CIFAR10(root='data/', train=False, download=True, transform=data_transforms['test'])
+
+    # Specify canary and non-canary indices within train dataset
+    all_indices = torch.randperm(len(full_trainset))
+    canary_indices = all_indices[:m]
+    non_canary_indices = all_indices[m:]
+
+    # Initialize Si for canaries to -1 or 1 with equal probability
+    Si = torch.randint(0, 2, (len(full_trainset),)) * 2 - 1
+    Si[non_canary_indices] = 1
+
+    # Find which indices will be in x_IN and x_OUT
+    x_IN_indices = torch.where(Si == 1)[0].tolist()
+    x_OUT_indices = torch.where(Si == -1)[0].tolist()
+    x_IN_set = torch.utils.data.Subset(full_trainset, x_IN_indices)
+    x_OUT_set = torch.utils.data.Subset(full_trainset, x_OUT_indices)
+
+    # Set up train loader (also thought of as x_IN loader) and the test loader, no x_OUT loader needed
+    trainloader = torch.utils.data.DataLoader(x_IN_set, batch_size=args.mini_bs, shuffle=True, num_workers=4)
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=4)
+
+    # Set up canary loader for later auditing
+    canary_set = torch.utils.data.Subset(full_trainset, canary_indices)
+    canary_loader = torch.utils.data.DataLoader(canary_set, batch_size=100, shuffle=False, num_workers=4)
+
+######################### TODO check end
 
     # Handle for gradient accumulation steps
     n_acc_steps = args.bs // args.mini_bs
 
     # Creae model and validate
-    net = timm.create_model(args.model, pretrained = True, num_classes = 2)
+    net = timm.create_model(args.model, pretrained = True, num_classes = 10)
     net = ModuleValidator.fix(net).to(device)
 
     # Create optimizer and loss functions
@@ -69,12 +94,12 @@ def main(args):
         for param in temp_layer.parameters():
             param.requires_grad_(True)
 
-    # Privacy engine
+    # Set up privacy engine, but use x_IN_set instead of full_trainset since not all training samples are used
     if 'nonDP' not in args.clipping_mode:
         # Calculate and display the noise level
         sigma = get_noise_multiplier(target_epsilon = args.epsilon,
-                                     target_delta = 1 / len(trainset),
-                                     sample_rate = args.bs / len(trainset),
+                                     target_delta = 1e-5, # TODO make this an argument?
+                                     sample_rate = args.bs / len(x_IN_set),
                                      epochs = args.epochs)
         print(f'adding noise level {sigma}')
         
@@ -82,11 +107,11 @@ def main(args):
         privacy_engine = PrivacyEngine(
             net,
             batch_size=args.bs,
-            sample_size=len(trainset),
+            sample_size=len(x_IN_set),
             noise_multiplier=sigma,
             epochs=args.epochs,
-            clipping_mode='MixOpt',
-            clipping_style='all-layer',
+            clipping_mode=args.clipping_mode,
+            clipping_style=args.clipping_style
         )
         privacy_engine.attach(optimizer)        
 
@@ -139,18 +164,45 @@ def main(args):
 
             # Store and print loss and accuracy information
             te_loss.append(test_loss / (batch_idx + 1))
-            te_acc.append(100. * correct/total)
+            te_acc.append(100. * correct / total)
             print('Epoch: ', epoch, 'Test Loss: %.3f | Acc: %.3f%% (%d/%d)'
                              % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
-    # Run train and test functions for number of epochs
+######################### TODO check start
+
+    def compute_loss_for_canaries(net, canary_loader, criterion, device):
+        # Function to compute loss for each canary
+        net.eval()
+        losses = []
+        with torch.no_grad():
+            for inputs, targets in canary_loader:
+                inputs, targets = inputs.to(device), targets.to(device)
+                outputs = net(inputs)
+                loss = criterion(outputs, targets)
+                losses.extend(loss.tolist())
+        return losses
+
+    # Run train and test functions for number of epochs, but save initial state of model first
+    w0 = net.state_dict()
     for epoch in range(args.epochs):
         train(epoch)
         test(epoch)
 
-    # Print final metrics
-    print(tr_loss,tr_acc,te_loss,te_acc)
+    # Save final state of model after training
+    wL = net.state_dict()
 
+    # Compute loss for canaries with inital and final weights, use information to compute scores
+    net.load_state_dict(w0)
+    initial_losses = compute_loss_for_canaries(net, canary_loader, criterion, device)
+    net.load_state_dict(wL)
+    final_losses = compute_loss_for_canaries(net, canary_loader, criterion, device)
+    scores = [initial - final for initial, final in zip(initial_losses, final_losses)]
+    Y = torch.tensor(scores)
+
+######################### TODO check end
+
+    # Print final metrics
+    print(tr_loss, tr_acc, te_loss, te_acc)
 
 if __name__ == '__main__':
     # Create and parse arguments
@@ -160,9 +212,12 @@ if __name__ == '__main__':
     parser.add_argument('--bs', default=100, type=int, help='batch size')
     parser.add_argument('--mini_bs', type=int, default=100)
     parser.add_argument('--epsilon', default=2, type=float, help='target epsilon')
-    parser.add_argument('--dataset_name', type=str, default='NOT_USED', help='https://pytorch.org/vision/stable/datasets.html')
-    parser.add_argument('--clipping_mode', type=str, default='MixOpt', choices=['BiTFiT','MixOpt', 'nonDP','nonDP-BiTFiT'])
+    parser.add_argument('--clipping_mode', type=str, default='MixOpt', choices=['BiTFiT', 'MixOpt', 'nonDP', 'nonDP-BiTFiT'])
+    parser.add_argument('--clipping_style', default='all-layer', nargs='+', type=str)
     parser.add_argument('--model', default='beit_base_patch16_224.in22k_ft_in22k', type=str, help='model name')
+    parser.add_argument('--m', type=int, default=50, help='number of auditing examples')
+    parser.add_argument('--k_plus', type=int, default=5, help='number of positive guesses')
+    parser.add_argument('--k_minus', type=int, default=5, help='number of negative guesses')
     args = parser.parse_args()
 
     # Run main function
