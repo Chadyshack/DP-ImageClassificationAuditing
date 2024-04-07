@@ -80,6 +80,7 @@ def main(args):
 
     # Create optimizer and loss functions
     criterion = nn.CrossEntropyLoss()
+    canary_criterion = nn.CrossEntropyLoss(reduction='none')
     optimizer = optim.SGD(net.parameters(), lr=args.lr)
 
     # Modify layers for BiTFiT
@@ -178,7 +179,7 @@ def main(args):
                 inputs, targets = inputs.to(device), targets.to(device)
                 outputs = net(inputs)
                 # Set reduction to none for full list of losses
-                loss = criterion(outputs, targets, reduction='none')
+                loss = canary_criterion(outputs, targets)
                 losses.extend(loss.tolist())
         return losses
 
