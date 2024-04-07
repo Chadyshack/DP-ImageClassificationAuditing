@@ -169,7 +169,7 @@ def main(args):
 
 ######################### TODO check start
 
-    def compute_loss_for_canaries(net, canary_loader, criterion, device):
+    def compute_loss_for_canaries():
         # Function to compute loss for each canary
         net.eval()
         losses = []
@@ -177,7 +177,8 @@ def main(args):
             for inputs, targets in canary_loader:
                 inputs, targets = inputs.to(device), targets.to(device)
                 outputs = net(inputs)
-                loss = criterion(outputs, targets)
+                # Set reduction to none for full list of losses
+                loss = criterion(outputs, targets, reduction='none')
                 losses.extend(loss.tolist())
         return losses
 
@@ -192,9 +193,9 @@ def main(args):
 
     # Compute loss for canaries with inital and final weights, use information to compute scores
     net.load_state_dict(w0)
-    initial_losses = compute_loss_for_canaries(net, canary_loader, criterion, device)
+    initial_losses = compute_loss_for_canaries()
     net.load_state_dict(wL)
-    final_losses = compute_loss_for_canaries(net, canary_loader, criterion, device)
+    final_losses = compute_loss_for_canaries()
     scores = [initial - final for initial, final in zip(initial_losses, final_losses)]
     Y = torch.tensor(scores)
 
