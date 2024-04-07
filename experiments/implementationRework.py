@@ -13,7 +13,6 @@ import timm
 from opacus.validators import ModuleValidator
 from opacus.accountants.utils import get_noise_multiplier
 from tqdm import tqdm
-import numpy as np
 import warnings; warnings.filterwarnings("ignore")
 
 # Main function for training and auditing
@@ -199,6 +198,20 @@ def main(args):
     scores = [initial - final for initial, final in zip(initial_losses, final_losses)]
     Y = torch.tensor(scores)
 
+    # Sort the scores to make guesses
+    sorted_indices = torch.argsort(Y, descending=True)
+    T = torch.zeros(m)
+    T[sorted_indices[:k_plus]] = 1
+    T[sorted_indices[-k_minus:]] = -1
+
+    # Load the true selection for the canaries
+    S = Si[canary_indices]
+
+    # TODO temp printing the results, but this should be ready for a test!!!!!!!
+    # things to consider: canary flipping, computing the correct guesses, ...
+    print("Vector T:", T.tolist())
+    print("Vector S:", S.tolist())
+
 ######################### TODO check end
 
     # Print final metrics
@@ -209,15 +222,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Image Classification and Auditing')
     parser.add_argument('--lr', default=5e-4, type=float, help='learning rate')
     parser.add_argument('--epochs', default=5, type=int, help='numter of epochs')
-    parser.add_argument('--bs', default=100, type=int, help='batch size')
-    parser.add_argument('--mini_bs', type=int, default=100)
-    parser.add_argument('--epsilon', default=2, type=float, help='target epsilon')
+    parser.add_argument('--bs', default=1000, type=int, help='batch size')
+    parser.add_argument('--mini_bs', type=int, default=50)
+    parser.add_argument('--epsilon', default=8, type=float, help='target epsilon')
     parser.add_argument('--clipping_mode', type=str, default='MixOpt', choices=['BiTFiT', 'MixOpt', 'nonDP', 'nonDP-BiTFiT'])
     parser.add_argument('--clipping_style', default='all-layer', nargs='+', type=str)
     parser.add_argument('--model', default='beit_base_patch16_224.in22k_ft_in22k', type=str, help='model name')
-    parser.add_argument('--m', type=int, default=50, help='number of auditing examples')
-    parser.add_argument('--k_plus', type=int, default=5, help='number of positive guesses')
-    parser.add_argument('--k_minus', type=int, default=5, help='number of negative guesses')
+    parser.add_argument('--m', type=int, default=5000, help='number of auditing examples')
+    parser.add_argument('--k_plus', type=int, default=750, help='number of positive guesses')
+    parser.add_argument('--k_minus', type=int, default=750, help='number of negative guesses')
     args = parser.parse_args()
 
     # Run main function
