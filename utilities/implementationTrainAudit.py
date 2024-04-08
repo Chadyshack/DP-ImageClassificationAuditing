@@ -1,5 +1,6 @@
 # Imports and configuration
 import argparse
+import os
 import torch.utils
 import torch.utils.data
 from fastDP import PrivacyEngine
@@ -43,9 +44,10 @@ def main(args):
     # TODO If augmentations are used, canary loader should not use them? (email about this later)
 
     # Load test and train datasets (denoting as full because this is reduced later)
-    full_trainset_temp = torchvision.datasets.CIFAR10(root='data/', train=True, download=True, transform=data_transforms['train'])
-    testset = torchvision.datasets.CIFAR10(root='data/', train=False, download=True, transform=data_transforms['test'])
-    
+    data_dir = '/s/lovelace/c/nobackup/iray/dp-imgclass/PediatricChestX-rayPneumoniaData'
+    full_trainset_temp = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
+    testset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'test'), data_transforms['test'])
+
     # TEMP testing m = n as suggested by paper
     indices = torch.randperm(len(full_trainset_temp))[:m * 2]
     full_trainset = torch.utils.data.Subset(full_trainset_temp, indices)
@@ -55,7 +57,7 @@ def main(args):
     canary_indices = all_indices[:m]
     non_canary_indices = all_indices[m:]
 
-    # TEMP Flip the labels for the canaries
+    # TODO Flip the labels for the canaries (email about how many, and when)
     # for idx in canary_indices:
     #     # Get the index within the original dataset
     #     original_idx = full_trainset.indices[idx]
@@ -90,13 +92,13 @@ def main(args):
     n_acc_steps = args.bs // args.mini_bs
 
     # Creae model and validate
-    net = timm.create_model(args.model, pretrained = False, num_classes = 10)
+    net = timm.create_model(args.model, pretrained = True, num_classes = 2)
     net = ModuleValidator.fix(net).to(device)
 
     # Create optimizer and loss functions
     criterion = nn.CrossEntropyLoss()
     canary_criterion = nn.CrossEntropyLoss(reduction='none')
-    optimizer = optim.SGD(net.parameters(), lr=args.lr)
+    optimizer = optim.Adam(net.parameters(), lr=args.lr)
 
     # Modify layers for BiTFiT
     if 'BiTFiT' in args.clipping_mode:
@@ -240,14 +242,14 @@ def main(args):
 if __name__ == '__main__':
     # Create and parse arguments
     parser = argparse.ArgumentParser(description='Image Classification and Privacy Auditing')
-    parser.add_argument('--lr', default=5e-4, type=float, help='learning rate')
-    parser.add_argument('--epochs', default=3, type=int, help='numter of epochs')
-    parser.add_argument('--bs', default=100, type=int, help='batch size')
-    parser.add_argument('--mini_bs', type=int, default=10)
-    parser.add_argument('--epsilon', default=8, type=float, help='target epsilon')
+    parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
+    parser.add_argument('--epochs', default=5, type=int, help='numter of epochs')
+    parser.add_argument('--bs', default=250, type=int, help='batch size')
+    parser.add_argument('--mini_bs', type=int, default=250)
+    parser.add_argument('--epsilon', default=1, type=float, help='target epsilon')
     parser.add_argument('--clipping_mode', type=str, default='MixOpt', choices=['BiTFiT', 'MixOpt', 'nonDP', 'nonDP-BiTFiT'])
     parser.add_argument('--clipping_style', default='all-layer', nargs='+', type=str)
-    parser.add_argument('--model', default='beit_base_patch16_224', type=str, help='model name')
+    parser.add_argument('--model', default='beit_base_patch16_224.in22k_ft_in22k', type=str, help='model name')
     parser.add_argument('--m', type=int, default=1000, help='number of auditing examples')
     parser.add_argument('--k_plus', type=int, default=50, help='number of positive guesses')
     parser.add_argument('--k_minus', type=int, default=50, help='number of negative guesses')
