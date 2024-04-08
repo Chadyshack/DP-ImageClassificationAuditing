@@ -1,6 +1,5 @@
 # Imports and configuration
 import argparse
-import os
 import torch.utils
 import torch.utils.data
 from fastDP import PrivacyEngine
@@ -41,9 +40,7 @@ def main(args):
 
 ######################### TODO check start
 
-    # TODO IMPLEMENT CANARY FLIPPING
-
-    # TODO If augmentations are used, canary loader should not use them? (email about this)
+    # TODO If augmentations are used, canary loader should not use them? (email about this later)
 
     # Load test and train datasets (denoting as full because this is reduced later)
     full_trainset_temp = torchvision.datasets.CIFAR10(root='data/', train=True, download=True, transform=data_transforms['train'])
@@ -57,6 +54,15 @@ def main(args):
     all_indices = torch.randperm(len(full_trainset))
     canary_indices = all_indices[:m]
     non_canary_indices = all_indices[m:]
+
+    # TEMP Flip the labels for the canaries
+    for idx in canary_indices:
+        # Get the current label
+        current_label = full_trainset.targets[idx]
+        # Flip the label by adding 1 and taking modulo 10
+        flipped_label = (current_label + 1) % 10
+        # Update the dataset with the flipped label
+        full_trainset.targets[idx] = flipped_label
 
     # Initialize Si for canaries to -1 or 1 with equal probability
     Si = torch.randint(0, 2, (len(full_trainset),)) * 2 - 1
