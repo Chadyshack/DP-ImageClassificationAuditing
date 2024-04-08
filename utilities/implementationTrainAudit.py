@@ -236,8 +236,8 @@ if __name__ == '__main__':
     parser.add_argument('--clipping_style', default='all-layer', nargs='+', type=str)
     parser.add_argument('--model', default='beit_base_patch16_224.in22k_ft_in22k', type=str, help='model name')
     parser.add_argument('--m', type=int, default=5000, help='number of auditing examples')
-    parser.add_argument('--k_plus', type=int, default=750, help='number of positive guesses')
-    parser.add_argument('--k_minus', type=int, default=750, help='number of negative guesses')
+    parser.add_argument('--k_plus', type=int, default=250, help='number of positive guesses')
+    parser.add_argument('--k_minus', type=int, default=250, help='number of negative guesses')
     args = parser.parse_args()
 
     # Run main function
