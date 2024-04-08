@@ -42,6 +42,8 @@ def main(args):
 
 ######################### TODO check start
 
+    # TODO IMPLEMENT CANARY FLIPPING?, ...?
+
     # Load test and train datasets (denoting as full because this is reduced later)
     full_trainset = torchvision.datasets.CIFAR10(root='data/', train=True, download=True, transform=data_transforms['train'])
     testset = torchvision.datasets.CIFAR10(root='data/', train=False, download=True, transform=data_transforms['test'])
@@ -209,10 +211,13 @@ def main(args):
     # Load the true selection for the canaries
     S = Si[canary_indices]
 
-    # TODO temp printing the results, but this should be ready for a test!!!!!!!
-    # things to consider: canary flipping, computing the correct guesses, ...
-    print("Vector T:", T.tolist())
-    print("Vector S:", S.tolist())
+    # Compare S and T to see how many guesses were correct, do not guess for zero values
+    guess_indices = torch.where(T != 0)[0]
+    correct_guesses = 0
+    for idx in guess_indices:
+        if T[idx] == S[idx]:
+            correct_guesses += 1
+    print("Correct Guesses: " + correct_guesses)
 
 ######################### TODO check end
 
