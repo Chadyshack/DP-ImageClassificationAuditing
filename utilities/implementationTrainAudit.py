@@ -104,7 +104,7 @@ def main(args):
                                      sample_rate = args.bs / len(x_IN_set),
                                      epochs = args.epochs)
         print(f'adding noise level {sigma}')
-        
+
         # Build privacy engine and attach it to the current optimizer
         privacy_engine = PrivacyEngine(
             net,
@@ -115,14 +115,14 @@ def main(args):
             clipping_mode=args.clipping_mode,
             clipping_style=args.clipping_style
         )
-        privacy_engine.attach(optimizer)        
+        privacy_engine.attach(optimizer)
 
     # Lists to store metrics
     tr_loss = []
     te_loss = []
     tr_acc = []
     te_acc = []
-    
+
     def train(epoch):
         # Run training logic on train samples
         net.train()
@@ -136,7 +136,7 @@ def main(args):
             loss.backward()
             if ((batch_idx + 1) % n_acc_steps == 0) or ((batch_idx + 1) == len(trainloader)):
                 optimizer.step()
-                optimizer.zero_grad()     
+                optimizer.zero_grad()
             train_loss += loss.item()
             total += targets.size(0)
             _, predicted = outputs.max(1)
@@ -228,7 +228,7 @@ if __name__ == '__main__':
     # Create and parse arguments
     parser = argparse.ArgumentParser(description='Image Classification and Privacy Auditing')
     parser.add_argument('--lr', default=5e-4, type=float, help='learning rate')
-    parser.add_argument('--epochs', default=5, type=int, help='numter of epochs')
+    parser.add_argument('--epochs', default=2, type=int, help='numter of epochs')
     parser.add_argument('--bs', default=1000, type=int, help='batch size')
     parser.add_argument('--mini_bs', type=int, default=50)
     parser.add_argument('--epsilon', default=8, type=float, help='target epsilon')
