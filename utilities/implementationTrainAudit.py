@@ -62,7 +62,7 @@ def main(args):
         # Get the current label from the original dataset
         current_label = full_trainset_temp.targets[original_idx]
         # Flip the label
-        flipped_label = (current_label + 1) % 10
+        flipped_label = (current_label + torch.randint(1, 10, (1,)).item()) % 10
         # Update the label in the original dataset
         full_trainset_temp.targets[original_idx] = flipped_label
 
