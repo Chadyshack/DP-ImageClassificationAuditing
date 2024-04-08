@@ -6,7 +6,6 @@ import torch.utils.data
 from fastDP import PrivacyEngine
 import torch
 import torchvision
-torch.manual_seed(2)
 import torch.nn as nn
 import torch.optim as optim
 import timm
@@ -42,11 +41,17 @@ def main(args):
 
 ######################### TODO check start
 
-    # TODO IMPLEMENT CANARY FLIPPING?, ...?
+    # TODO IMPLEMENT CANARY FLIPPING
+
+    # TODO If augmentations are used, canary loader should not use them? (email about this)
 
     # Load test and train datasets (denoting as full because this is reduced later)
-    full_trainset = torchvision.datasets.CIFAR10(root='data/', train=True, download=True, transform=data_transforms['train'])
+    full_trainset_temp = torchvision.datasets.CIFAR10(root='data/', train=True, download=True, transform=data_transforms['train'])
     testset = torchvision.datasets.CIFAR10(root='data/', train=False, download=True, transform=data_transforms['test'])
+    
+    # TEMP testing m = n as suggested by paper
+    indices = torch.randperm(len(full_trainset_temp))[:m]
+    full_trainset = torch.utils.data.Subset(full_trainset_temp, indices)
 
     # Specify canary and non-canary indices within train dataset
     all_indices = torch.randperm(len(full_trainset))
@@ -228,16 +233,16 @@ if __name__ == '__main__':
     # Create and parse arguments
     parser = argparse.ArgumentParser(description='Image Classification and Privacy Auditing')
     parser.add_argument('--lr', default=5e-4, type=float, help='learning rate')
-    parser.add_argument('--epochs', default=2, type=int, help='numter of epochs')
-    parser.add_argument('--bs', default=1000, type=int, help='batch size')
-    parser.add_argument('--mini_bs', type=int, default=50)
+    parser.add_argument('--epochs', default=3, type=int, help='numter of epochs')
+    parser.add_argument('--bs', default=100, type=int, help='batch size')
+    parser.add_argument('--mini_bs', type=int, default=10)
     parser.add_argument('--epsilon', default=8, type=float, help='target epsilon')
     parser.add_argument('--clipping_mode', type=str, default='MixOpt', choices=['BiTFiT', 'MixOpt', 'nonDP', 'nonDP-BiTFiT'])
     parser.add_argument('--clipping_style', default='all-layer', nargs='+', type=str)
     parser.add_argument('--model', default='beit_base_patch16_224.in22k_ft_in22k', type=str, help='model name')
-    parser.add_argument('--m', type=int, default=5000, help='number of auditing examples')
-    parser.add_argument('--k_plus', type=int, default=250, help='number of positive guesses')
-    parser.add_argument('--k_minus', type=int, default=250, help='number of negative guesses')
+    parser.add_argument('--m', type=int, default=1000, help='number of auditing examples')
+    parser.add_argument('--k_plus', type=int, default=50, help='number of positive guesses')
+    parser.add_argument('--k_minus', type=int, default=50, help='number of negative guesses')
     args = parser.parse_args()
 
     # Run main function
