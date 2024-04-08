@@ -43,16 +43,15 @@ def main(args):
 
 ######################### TODO check start
 
-    # TODO If augmentations are used, canary loader should not use them? (email about this later)
-
     # Load test and train datasets (denoting as full because this is reduced later)
     data_dir = '/s/lovelace/c/nobackup/iray/dp-imgclass/PediatricChestX-rayPneumoniaData'
-    full_trainset_temp = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
+    full_trainset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
+    full_trainset_testaug = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['test'])
     testset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'test'), data_transforms['test'])
 
-    # TEMP testing m = n as suggested by paper
-    indices = torch.randperm(len(full_trainset_temp))[:m * 2]
-    full_trainset = torch.utils.data.Subset(full_trainset_temp, indices)
+    # TODO testing m = n as suggested by paper
+    # indices = torch.randperm(len(full_trainset_temp))[:m * 2]
+    # full_trainset = torch.utils.data.Subset(full_trainset_temp, indices)
 
     # Specify canary and non-canary indices within train dataset
     all_indices = torch.randperm(len(full_trainset))
@@ -85,7 +84,8 @@ def main(args):
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=4)
 
     # Set up canary loader for later auditing
-    canary_set = torch.utils.data.Subset(full_trainset, canary_indices)
+    # TODO email authors and ask if different augs when testing canaries should be used
+    canary_set = torch.utils.data.Subset(full_trainset_testaug, canary_indices)
     canary_loader = torch.utils.data.DataLoader(canary_set, batch_size=100, shuffle=False, num_workers=4)
 
 ######################### TODO check end
@@ -252,9 +252,9 @@ if __name__ == '__main__':
     parser.add_argument('--clipping_mode', type=str, default='MixOpt', choices=['BiTFiT', 'MixOpt', 'nonDP', 'nonDP-BiTFiT'])
     parser.add_argument('--clipping_style', default='all-layer', nargs='+', type=str)
     parser.add_argument('--model', default='beit_base_patch16_224.in22k_ft_in22k', type=str, help='model name')
-    parser.add_argument('--m', type=int, default=1000, help='number of auditing examples')
-    parser.add_argument('--k_plus', type=int, default=50, help='number of positive guesses')
-    parser.add_argument('--k_minus', type=int, default=50, help='number of negative guesses')
+    parser.add_argument('--m', type=int, default=500, help='number of auditing examples')
+    parser.add_argument('--k_plus', type=int, default=25, help='number of positive guesses')
+    parser.add_argument('--k_minus', type=int, default=25, help='number of negative guesses')
     args = parser.parse_args()
 
     # Run main function
