@@ -1,6 +1,7 @@
 # Imports and configuration
 import argparse
 import os
+import copy
 import torch.utils
 import torch.utils.data
 from fastDP import PrivacyEngine
@@ -197,19 +198,19 @@ def main(args):
             for inputs, targets in canary_loader:
                 inputs, targets = inputs.to(device), targets.to(device)
                 outputs = net(inputs)
-                # Set reduction to none for full list of losses
+                # Use loss with reduction set to none for full list of losses
                 loss = canary_criterion(outputs, targets)
                 losses.extend(loss.tolist())
         return losses
 
     # Run train and test functions for number of epochs, but save initial state of model first
-    w0 = net.state_dict()
+    w0 = copy.deepcopy(net.state_dict())
     for epoch in range(args.epochs):
         train(epoch)
         test(epoch)
 
     # Save final state of model after training
-    wL = net.state_dict()
+    wL = copy.deepcopy(net.state_dict())
 
     # Compute loss for canaries with inital and final weights, use information to compute scores
     net.load_state_dict(w0)
