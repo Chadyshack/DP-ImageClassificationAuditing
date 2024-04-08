@@ -217,7 +217,7 @@ def main(args):
     for idx in guess_indices:
         if T[idx] == S[idx]:
             correct_guesses += 1
-    print("Correct Guesses: " + correct_guesses)
+    print("Correct Guesses: " + str(correct_guesses))
 
 ######################### TODO check end
 
