@@ -57,12 +57,14 @@ def main(args):
 
     # TEMP Flip the labels for the canaries
     for idx in canary_indices:
-        # Get the current label
-        current_label = full_trainset.targets[idx]
-        # Flip the label by adding 1 and taking modulo 10
+        # Get the index within the original dataset
+        original_idx = full_trainset.indices[idx]
+        # Get the current label from the original dataset
+        current_label = full_trainset_temp.targets[original_idx]
+        # Flip the label
         flipped_label = (current_label + 1) % 10
-        # Update the dataset with the flipped label
-        full_trainset.targets[idx] = flipped_label
+        # Update the label in the original dataset
+        full_trainset_temp.targets[original_idx] = flipped_label
 
     # Initialize Si for canaries to -1 or 1 with equal probability
     Si = torch.randint(0, 2, (len(full_trainset),)) * 2 - 1
