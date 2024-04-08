@@ -56,15 +56,15 @@ def main(args):
     non_canary_indices = all_indices[m:]
 
     # TEMP Flip the labels for the canaries
-    for idx in canary_indices:
-        # Get the index within the original dataset
-        original_idx = full_trainset.indices[idx]
-        # Get the current label from the original dataset
-        current_label = full_trainset_temp.targets[original_idx]
-        # Flip the label
-        flipped_label = (current_label + torch.randint(1, 10, (1,)).item()) % 10
-        # Update the label in the original dataset
-        full_trainset_temp.targets[original_idx] = flipped_label
+    # for idx in canary_indices:
+    #     # Get the index within the original dataset
+    #     original_idx = full_trainset.indices[idx]
+    #     # Get the current label from the original dataset
+    #     current_label = full_trainset_temp.targets[original_idx]
+    #     # Flip the label
+    #     flipped_label = (current_label + torch.randint(1, 10, (1,)).item()) % 10
+    #     # Update the label in the original dataset
+    #     full_trainset_temp.targets[original_idx] = flipped_label
 
     # Initialize Si for canaries to -1 or 1 with equal probability
     Si = torch.randint(0, 2, (len(full_trainset),)) * 2 - 1
@@ -90,7 +90,7 @@ def main(args):
     n_acc_steps = args.bs // args.mini_bs
 
     # Creae model and validate
-    net = timm.create_model(args.model, pretrained = True, num_classes = 10)
+    net = timm.create_model(args.model, pretrained = False, num_classes = 10)
     net = ModuleValidator.fix(net).to(device)
 
     # Create optimizer and loss functions
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     parser.add_argument('--epsilon', default=8, type=float, help='target epsilon')
     parser.add_argument('--clipping_mode', type=str, default='MixOpt', choices=['BiTFiT', 'MixOpt', 'nonDP', 'nonDP-BiTFiT'])
     parser.add_argument('--clipping_style', default='all-layer', nargs='+', type=str)
-    parser.add_argument('--model', default='beit_base_patch16_224.in22k_ft_in22k', type=str, help='model name')
+    parser.add_argument('--model', default='beit_base_patch16_224', type=str, help='model name')
     parser.add_argument('--m', type=int, default=1000, help='number of auditing examples')
     parser.add_argument('--k_plus', type=int, default=50, help='number of positive guesses')
     parser.add_argument('--k_minus', type=int, default=50, help='number of negative guesses')
