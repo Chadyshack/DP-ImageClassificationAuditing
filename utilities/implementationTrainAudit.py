@@ -50,7 +50,7 @@ def main(args):
     testset = torchvision.datasets.CIFAR10(root='data/', train=False, download=True, transform=data_transforms['test'])
     
     # TEMP testing m = n as suggested by paper
-    indices = torch.randperm(len(full_trainset_temp))[:m]
+    indices = torch.randperm(len(full_trainset_temp))[:m * 2]
     full_trainset = torch.utils.data.Subset(full_trainset_temp, indices)
 
     # Specify canary and non-canary indices within train dataset
