@@ -42,7 +42,7 @@ def main(args):
         ]),
     }
 
-######################### TODO check start
+######################### TODO implementation start
 
     # Load test and train datasets (denoting as full because this is reduced later)
     data_dir = '/s/lovelace/c/nobackup/iray/dp-imgclass/PediatricChestX-rayPneumoniaData'
@@ -50,25 +50,12 @@ def main(args):
     full_trainset_testaug = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['test'])
     testset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'test'), data_transforms['test'])
 
-    # TODO testing m = n as suggested by paper
-    # indices = torch.randperm(len(full_trainset_temp))[:m * 2]
-    # full_trainset = torch.utils.data.Subset(full_trainset_temp, indices)
-
     # Specify canary and non-canary indices within train dataset
     all_indices = torch.randperm(len(full_trainset))
     canary_indices = all_indices[:m]
     non_canary_indices = all_indices[m:]
 
     # TODO Flip the labels for the canaries (email about how many, and when)
-    # for idx in canary_indices:
-    #     # Get the index within the original dataset
-    #     original_idx = full_trainset.indices[idx]
-    #     # Get the current label from the original dataset
-    #     current_label = full_trainset_temp.targets[original_idx]
-    #     # Flip the label
-    #     flipped_label = (current_label + torch.randint(1, 10, (1,)).item()) % 10
-    #     # Update the label in the original dataset
-    #     full_trainset_temp.targets[original_idx] = flipped_label
 
     # Initialize Si for canaries to -1 or 1 with equal probability
     Si = torch.randint(0, 2, (len(full_trainset),)) * 2 - 1
@@ -89,7 +76,7 @@ def main(args):
     canary_set = torch.utils.data.Subset(full_trainset_testaug, canary_indices)
     canary_loader = torch.utils.data.DataLoader(canary_set, batch_size=100, shuffle=False, num_workers=4)
 
-######################### TODO check end
+######################### TODO implementation end
 
     # Handle for gradient accumulation steps
     n_acc_steps = args.bs // args.mini_bs
@@ -188,7 +175,7 @@ def main(args):
             print('Epoch: ', epoch, 'Test Loss: %.3f | Acc: %.3f%% (%d/%d)'
                              % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
-######################### TODO check start
+######################### TODO implementation start
 
     def compute_loss_for_canaries():
         # Function to compute loss for each canary
@@ -237,7 +224,7 @@ def main(args):
             correct_guesses += 1
     print("Correct Guesses: " + str(correct_guesses))
 
-######################### TODO check end
+######################### TODO implementation end
 
     # Print final metrics
     print(tr_loss, tr_acc, te_loss, te_acc)
