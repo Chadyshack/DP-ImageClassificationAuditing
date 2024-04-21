@@ -56,6 +56,11 @@ def main(args):
     non_canary_indices = all_indices[m:]
 
     # TODO Flip the labels for the canaries (email about how many, and when)
+    # for index in canary_indices:
+    #     current_label = full_trainset.samples[index][1]
+    #     new_label = 1 - current_label
+    #     full_trainset.samples[index] = (full_trainset.samples[index][0], new_label)
+    #     full_trainset_testaug.samples[index] = (full_trainset_testaug.samples[index][0], new_label)    
 
     # Initialize Si for canaries to -1 or 1 with equal probability
     Si = torch.randint(0, 2, (len(full_trainset),)) * 2 - 1
