@@ -40,46 +40,45 @@ def main(args):
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]),
+        'none': torchvision.transforms.Compose([
+            torchvision.transforms.Resize((224, 224)),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
     }
 
 ######################### TODO implementation start
 
-    # Load test and train datasets (denoting as full because this is reduced later)
+    # Load test and train datasets
     data_dir = '/s/lovelace/c/nobackup/iray/dp-imgclass/PediatricChestX-rayPneumoniaData'
-    full_trainset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
-    full_trainset_testaug = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['test'])
+    trainset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
+    trainset_noaug = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['none'])
     testset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'test'), data_transforms['test'])
 
-    # Specify canary and non-canary indices within train dataset
-    all_indices = torch.randperm(len(full_trainset))
+    # TODO Add m canaries to the beginning of trainset and trainset_noaug
+    here ...
+    all_indices = torch.randperm(len(trainset))
     canary_indices = all_indices[:m]
     non_canary_indices = all_indices[m:]
 
-    # TODO Flip the labels for the canaries (email about how many, and when)
-    # for index in canary_indices:
-    #     current_label = full_trainset.samples[index][1]
-    #     new_label = 1 - current_label
-    #     full_trainset.samples[index] = (full_trainset.samples[index][0], new_label)
-    #     full_trainset_testaug.samples[index] = (full_trainset_testaug.samples[index][0], new_label)    
-
     # Initialize Si for canaries to -1 or 1 with equal probability
-    Si = torch.randint(0, 2, (len(full_trainset),)) * 2 - 1
+    Si = torch.randint(0, 2, (len(trainset),)) * 2 - 1
     Si[non_canary_indices] = 1
 
     # Find which indices will be in x_IN and x_OUT
     x_IN_indices = torch.where(Si == 1)[0].tolist()
     x_OUT_indices = torch.where(Si == -1)[0].tolist()
-    x_IN_set = torch.utils.data.Subset(full_trainset, x_IN_indices)
-    x_OUT_set = torch.utils.data.Subset(full_trainset, x_OUT_indices)
+    x_IN_set = torch.utils.data.Subset(trainset, x_IN_indices)
+    x_OUT_set = torch.utils.data.Subset(trainset, x_OUT_indices)
 
     # Set up train loader (also thought of as x_IN loader) and the test loader, no x_OUT loader needed
     trainloader = torch.utils.data.DataLoader(x_IN_set, batch_size=args.mini_bs, shuffle=True, num_workers=4)
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=4)
 
     # Set up canary loader for later auditing
-    # TODO email authors and ask if different augs when testing canaries should be used
-    canary_set = torch.utils.data.Subset(full_trainset_testaug, canary_indices)
-    canary_loader = torch.utils.data.DataLoader(canary_set, batch_size=100, shuffle=False, num_workers=4)
+    # TODO email authors about augmentations for canaries, just running no augmentations for now
+    canary_set = torch.utils.data.Subset(trainset_noaug, canary_indices)
+    canary_loader = torch.utils.data.DataLoader(canary_set, batch_size=1, shuffle=False, num_workers=4)
 
 ######################### TODO implementation end
 
@@ -92,7 +91,6 @@ def main(args):
 
     # Create optimizer and loss functions
     criterion = nn.CrossEntropyLoss()
-    canary_criterion = nn.CrossEntropyLoss(reduction='none')
     optimizer = optim.Adam(net.parameters(), lr=args.lr)
 
     # Modify layers for BiTFiT
@@ -182,35 +180,96 @@ def main(args):
 
 ######################### TODO implementation start
 
-    def compute_loss_for_canaries():
-        # Function to compute loss for each canary
-        net.eval()
-        losses = []
-        with torch.no_grad():
-            for inputs, targets in canary_loader:
-                inputs, targets = inputs.to(device), targets.to(device)
-                outputs = net(inputs)
-                # Use loss with reduction set to none for full list of losses
-                loss = canary_criterion(outputs, targets)
-                losses.extend(loss.tolist())
-        return losses
-
     # Run train and test functions for number of epochs, but save initial state of model first
-    w0 = copy.deepcopy(net.state_dict())
+    model_states = []
+    model_states.append(copy.deepcopy(net.state_dict()))
     for epoch in range(args.epochs):
         train(epoch)
         test(epoch)
+        # Save the state of the current model
+        model_states.append(copy.deepcopy(net.state_dict()))
 
     # Save final state of model after training
-    wL = copy.deepcopy(net.state_dict())
+    model_states.append(copy.deepcopy(net.state_dict()))
 
-    # Compute loss for canaries with inital and final weights, use information to compute scores
-    net.load_state_dict(w0)
-    initial_losses = compute_loss_for_canaries()
-    net.load_state_dict(wL)
-    final_losses = compute_loss_for_canaries()
-    scores = [initial - final for initial, final in zip(initial_losses, final_losses)]
+
+
+
+
+
+
+
+    optimizer.
+
+
+# we need to steal per sample gradients and their norms from the priv engine before noise is added
+
+    privacy_engine
+
+    # Compute scores from each of the model weights for each canary sample
+    scores = []
+    net.eval()
+    clipping_fn = privacy_engine
+    for i in range(1, len(model_states)):
+        # Load the model state at epoch i-1
+        net.load_state_dict(model_states[i - 1])
+        initial_gradients = []
+
+        # Compute gradients for the initial state
+        for inputs, targets in canary_loader:
+            inputs, targets = inputs.to(device), targets.to(device)
+            inputs.requires_grad = True
+            
+            model.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+
+            # Apply clipping using the clipping function from PrivacyEngine
+            clipping_fn(model)
+
+            # Save the clipped gradients
+            initial_gradients.append(inputs.grad.clone())
+
+        # Now compute the influence score using the state at time i
+        model.load_state_dict(model_states[i])
+
+        # Compare against gradients from the previous state
+        for j, (inputs, targets) in enumerate(canary_loader):
+            inputs, targets = inputs.to(device), targets.to(device)
+            inputs.requires_grad = True
+            
+            model.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            loss.backward()
+
+            # Apply clipping to these new gradients
+            clipping_fn(model)
+
+            # Calculate the score based on the dot product of the clipped gradient difference and weight update
+            delta_weights = {name: model_states[i][name] - model_states[i-1][name] for name in model_states[i]}
+            score = sum(
+                (inputs.grad.flatten() * delta_weights[name].flatten()).sum()
+                for name in delta_weights
+            )
+            scores.append(score.item())
     Y = torch.tensor(scores)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     # Sort the scores to make guesses
     sorted_indices = torch.argsort(Y, descending=True)
