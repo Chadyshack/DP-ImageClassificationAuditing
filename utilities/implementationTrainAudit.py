@@ -77,9 +77,9 @@ def main(args):
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=4)
 
     # Set up canary loader for later auditing
-    # TODO email authors and ask if different augs when testing canaries should be used
+    # TODO email authors and ask if different augs when testing canaries should be used (if using augs)
     canary_set = torch.utils.data.Subset(full_trainset_testaug, canary_indices)
-    canary_loader = torch.utils.data.DataLoader(canary_set, batch_size=100, shuffle=False, num_workers=4)
+    canary_loader = torch.utils.data.DataLoader(canary_set, batch_size=1, shuffle=False, num_workers=4)
 
 ######################### TODO implementation end
 
@@ -90,9 +90,8 @@ def main(args):
     net = timm.create_model(args.model, pretrained = True, num_classes = 2)
     net = ModuleValidator.fix(net).to(device)
 
-    # Create optimizer and loss functions
+    # Create optimizer and loss function
     criterion = nn.CrossEntropyLoss()
-    canary_criterion = nn.CrossEntropyLoss(reduction='none')
     optimizer = optim.Adam(net.parameters(), lr=args.lr)
 
     # Modify layers for BiTFiT
@@ -190,9 +189,8 @@ def main(args):
             for inputs, targets in canary_loader:
                 inputs, targets = inputs.to(device), targets.to(device)
                 outputs = net(inputs)
-                # Use loss with reduction set to none for full list of losses
-                loss = canary_criterion(outputs, targets)
-                losses.extend(loss.tolist())
+                loss = criterion(outputs, targets)
+                losses.append(loss.item())
         return losses
 
     # Run train and test functions for number of epochs, but save initial state of model first
