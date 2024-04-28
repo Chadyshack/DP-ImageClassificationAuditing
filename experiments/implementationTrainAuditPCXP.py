@@ -60,7 +60,8 @@ def main(args):
     # Specify canary and non-canary indices within train dataset randomly
     all_indices = torch.randperm(len(full_trainset))
     canary_indices = all_indices[:m]
-    non_canary_indices = all_indices[n:]
+    non_canary_indices = all_indices[m:m+n]
+    non_included_indices = all_indices[m+n:]
 
     # Flip the labels for the canaries if flipping
     if flip_canaries:
@@ -78,9 +79,10 @@ def main(args):
             full_trainset.samples[index] = (full_trainset.samples[index][0], new_label)
             full_trainset_canaryaug.samples[index] = (full_trainset_canaryaug.samples[index][0], new_label)    
 
-    # Initialize Si for canaries to -1 or 1 with equal probability
+    # Initialize Si for canaries to -1 or 1 with equal probability, set non-included indices to 2
     Si = torch.randint(0, 2, (len(full_trainset),)) * 2 - 1
     Si[non_canary_indices] = 1
+    Si[non_included_indices] = 2
 
     # Find which indices will be in x_IN and x_OUT
     x_IN_indices = torch.where(Si == 1)[0].tolist()
