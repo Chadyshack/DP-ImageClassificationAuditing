@@ -109,9 +109,9 @@ def _per_block_clip_grad(
 
         norm_sample = torch.stack([param.norm_sample for name, param in named_params if hasattr(param,'norm_sample')], dim=0).norm(2, dim=0)
         # TODO this is where the magic happens in May...
-        for name, param in named_params:
-            if hasattr(param,'norm_sample'):
-                print(param.norm_sample)
+        #for name, param in named_params:
+        #    if hasattr(param,'norm_sample'):
+        #        print(param.norm_sample)
         # compute per-sample grad norm and clipping factor
         if clipping_fn=='automatic':
             C = max_grad_norm_layerwise / (norm_sample + numerical_stability_constant)
