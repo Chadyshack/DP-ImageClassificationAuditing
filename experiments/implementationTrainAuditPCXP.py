@@ -239,8 +239,6 @@ def main(args):
             correct_guesses += 1
     print("Correct Guesses: " + str(correct_guesses))
 
-######################### TODO implementation end
-
     # Print final metrics
     print(tr_loss, tr_acc, te_loss, te_acc)
 
