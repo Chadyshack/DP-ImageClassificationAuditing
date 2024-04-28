@@ -13,6 +13,7 @@ import timm
 from opacus.validators import ModuleValidator
 from opacus.accountants.utils import get_noise_multiplier
 from tqdm import tqdm
+import random
 import warnings; warnings.filterwarnings("ignore")
 
 # Main function for training and auditing
@@ -25,6 +26,8 @@ def main(args):
     m = args.m
     k_plus = args.k_plus
     k_minus = args.k_minus
+    flip_canaries = args.flip_canaries
+    n = args.n
 
     # Data transformations and loading
     data_transforms = {
@@ -40,27 +43,40 @@ def main(args):
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]),
+        'canary': torchvision.transforms.Compose([
+            torchvision.transforms.Resize(256),
+            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
     }
-
-######################### TODO implementation start
 
     # Load test and train datasets (denoting as full because this is reduced later)
     data_dir = '/s/lovelace/c/nobackup/iray/dp-imgclass/PediatricChestX-rayPneumoniaData'
     full_trainset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
-    full_trainset_testaug = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['test'])
     testset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'test'), data_transforms['test'])
+    full_trainset_canaryaug = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['canary'])
 
-    # Specify canary and non-canary indices within train dataset
+    # Specify canary and non-canary indices within train dataset randomly
     all_indices = torch.randperm(len(full_trainset))
     canary_indices = all_indices[:m]
-    non_canary_indices = all_indices[m:]
+    non_canary_indices = all_indices[n:]
 
-    # TODO Flip the labels for the canaries (email about how many, and when)
-    # for index in canary_indices:
-    #     current_label = full_trainset.samples[index][1]
-    #     new_label = 1 - current_label
-    #     full_trainset.samples[index] = (full_trainset.samples[index][0], new_label)
-    #     full_trainset_testaug.samples[index] = (full_trainset_testaug.samples[index][0], new_label)    
+    # Flip the labels for the canaries if flipping
+    if flip_canaries:
+        # Find all possible labels
+        all_labels = list(range(2))
+        for index in canary_indices:
+            # Find the current label, make list to randomly select from not including it
+            current_label = full_trainset.samples[index][1]
+            new_labels = [label for label in all_labels if label != current_label]
+
+            # Randomly select a new label
+            new_label = random.choice(new_labels)
+
+            # Update both full trainsets with this flipped label
+            full_trainset.samples[index] = (full_trainset.samples[index][0], new_label)
+            full_trainset_canaryaug.samples[index] = (full_trainset_canaryaug.samples[index][0], new_label)    
 
     # Initialize Si for canaries to -1 or 1 with equal probability
     Si = torch.randint(0, 2, (len(full_trainset),)) * 2 - 1
@@ -77,11 +93,8 @@ def main(args):
     testloader = torch.utils.data.DataLoader(testset, batch_size=100, shuffle=False, num_workers=4)
 
     # Set up canary loader for later auditing
-    # TODO email authors and ask if different augs when testing canaries should be used (if using augs)
-    canary_set = torch.utils.data.Subset(full_trainset_testaug, canary_indices)
-    canary_loader = torch.utils.data.DataLoader(canary_set, batch_size=1, shuffle=False, num_workers=4)
-
-######################### TODO implementation end
+    canary_set = torch.utils.data.Subset(full_trainset_canaryaug, canary_indices)
+    canary_loader = torch.utils.data.DataLoader(canary_set, batch_size=100, shuffle=False, num_workers=4)
 
     # Handle for gradient accumulation steps
     n_acc_steps = args.bs // args.mini_bs
@@ -90,8 +103,9 @@ def main(args):
     net = timm.create_model(args.model, pretrained = True, num_classes = 2)
     net = ModuleValidator.fix(net).to(device)
 
-    # Create optimizer and loss function
+    # Create optimizer and loss functions
     criterion = nn.CrossEntropyLoss()
+    canary_criterion = nn.CrossEntropyLoss(reduction='none')
     optimizer = optim.Adam(net.parameters(), lr=args.lr)
 
     # Modify layers for BiTFiT
@@ -109,7 +123,7 @@ def main(args):
     if 'nonDP' not in args.clipping_mode:
         # Calculate and display the noise level
         sigma = get_noise_multiplier(target_epsilon = args.epsilon,
-                                     target_delta = 1e-5, # TODO make this an argument?
+                                     target_delta = 1e-5,
                                      sample_rate = args.bs / len(x_IN_set),
                                      epochs = args.epochs)
         print(f'adding noise level {sigma}')
@@ -179,8 +193,6 @@ def main(args):
             print('Epoch: ', epoch, 'Test Loss: %.3f | Acc: %.3f%% (%d/%d)'
                              % (test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
 
-######################### TODO implementation start
-
     def compute_loss_for_canaries():
         # Function to compute loss for each canary
         net.eval()
@@ -189,8 +201,8 @@ def main(args):
             for inputs, targets in canary_loader:
                 inputs, targets = inputs.to(device), targets.to(device)
                 outputs = net(inputs)
-                loss = criterion(outputs, targets)
-                losses.append(loss.item())
+                loss = canary_criterion(outputs, targets)
+                losses.extend(loss.tolist())
         return losses
 
     # Run train and test functions for number of epochs, but save initial state of model first
@@ -232,6 +244,8 @@ def main(args):
     # Print final metrics
     print(tr_loss, tr_acc, te_loss, te_acc)
 
+    # TODO recap on all params...
+
 if __name__ == '__main__':
     # Create and parse arguments
     parser = argparse.ArgumentParser(description='Image Classification and Privacy Auditing')
@@ -246,6 +260,8 @@ if __name__ == '__main__':
     parser.add_argument('--m', type=int, default=500, help='number of auditing examples')
     parser.add_argument('--k_plus', type=int, default=25, help='number of positive guesses')
     parser.add_argument('--k_minus', type=int, default=25, help='number of negative guesses')
+    parser.add_argument('--flip_canaries', type=bool, default=False, help='whether to randomly flip canaries')
+    parser.add_argument('--n', type=int, default=0, help='number of non-auditing samples')
     args = parser.parse_args()
 
     # Run main function
