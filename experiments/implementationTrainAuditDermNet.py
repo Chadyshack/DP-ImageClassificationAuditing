@@ -32,27 +32,26 @@ def main(args):
     # Data transformations and loading
     data_transforms = {
         'train': torchvision.transforms.Compose([
-            torchvision.transforms.RandomResizedCrop(224),
+            torchvision.transforms.Resize((224, 224)),
             torchvision.transforms.RandomHorizontalFlip(),
+            torchvision.transforms.RandomAffine(degrees=(-10, 10), translate=(0, 0.1), scale=(0.9, 1), shear=(0, 5, 0, 5)),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]),
         'test': torchvision.transforms.Compose([
-            torchvision.transforms.Resize(256),
-            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Resize((224, 224)),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]),
         'canary': torchvision.transforms.Compose([
-            torchvision.transforms.Resize(256),
-            torchvision.transforms.CenterCrop(224),
+            torchvision.transforms.Resize((224, 224)),
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
     }
 
     # Load test and train datasets (denoting as full because this is reduced later)
-    data_dir = '/s/lovelace/c/nobackup/iray/dp-imgclass/PediatricChestX-rayPneumoniaData'
+    data_dir = '/s/lovelace/c/nobackup/iray/dp-imgclass/DermNet'
     full_trainset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['train'])
     testset = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'test'), data_transforms['test'])
     full_trainset_canaryaug = torchvision.datasets.ImageFolder(os.path.join(data_dir, 'train'), data_transforms['canary'])
@@ -102,7 +101,7 @@ def main(args):
     n_acc_steps = args.bs // args.mini_bs
 
     # Create model and validate
-    net = timm.create_model(args.model, pretrained = True, num_classes = 2)
+    net = timm.create_model(args.model, pretrained = True, num_classes = 23)
     net = ModuleValidator.fix(net).to(device)
 
     # Create optimizer and loss functions
@@ -250,10 +249,10 @@ if __name__ == '__main__':
     # Create and parse arguments
     parser = argparse.ArgumentParser(description='Image Classification and Privacy Auditing')
     parser.add_argument('--lr', default=1e-3, type=float, help='learning rate')
-    parser.add_argument('--epochs', default=5, type=int, help='numter of epochs')
-    parser.add_argument('--bs', default=250, type=int, help='batch size')
-    parser.add_argument('--mini_bs', type=int, default=250)
-    parser.add_argument('--epsilon', default=1, type=float, help='target epsilon')
+    parser.add_argument('--epochs', default=10, type=int, help='numter of epochs')
+    parser.add_argument('--bs', default=1000, type=int, help='batch size')
+    parser.add_argument('--mini_bs', type=int, default=100)
+    parser.add_argument('--epsilon', default=2, type=float, help='target epsilon')
     parser.add_argument('--clipping_mode', type=str, default='MixOpt', choices=['BiTFiT', 'MixOpt', 'nonDP', 'nonDP-BiTFiT'])
     parser.add_argument('--clipping_style', default='all-layer', nargs='+', type=str)
     parser.add_argument('--model', default='beit_base_patch16_224.in22k_ft_in22k', type=str, help='model name')
