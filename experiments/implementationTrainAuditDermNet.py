@@ -65,7 +65,7 @@ def main(args):
     # Flip the labels for the canaries if flipping
     if flip_canaries:
         # Find all possible labels
-        all_labels = list(range(2))
+        all_labels = list(range(23))
         for index in canary_indices:
             # Find the current label, make list to randomly select from not including it
             current_label = full_trainset.samples[index][1]
